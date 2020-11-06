@@ -1,4 +1,4 @@
-FROM ubuntu:14.04
+FROM ubuntu:20.10
 
 # Enable production settings by default; for development, this can be set to 
 # `false` in `docker run --env`
@@ -18,26 +18,29 @@ RUN apt-get update && apt-get install -y \
     mysql-server \
     nginx \
     python-dev \
-    python-mysqldb \
+    python3 \
+    python3-pip \
+    python3-mysqldb \
     python-setuptools \
-    supervisor \
-    vim
-RUN easy_install pip
+    supervisor
 
 # Handle urllib3 InsecurePlatformWarning
-RUN apt-get install -y libffi-dev libssl-dev libpython2.7-dev
+RUN apt-get install -y libffi-dev libssl-dev libpython3.8
 RUN pip install urllib3[security] requests[security] ndg-httpsclient pyasn1
 
 # Configure Django project
-ADD . /code
+RUN mkdir /control
+COPY requirements.txt /control/requirements.txt
+COPY nginx.conf /control/nginx.conf
+COPY initialize.sh /control/initialize.sh
+RUN mkdir /code
 RUN mkdir /djangomedia
 RUN mkdir /static
 RUN mkdir /logs
 RUN mkdir /logs/nginx
 RUN mkdir /logs/gunicorn
-WORKDIR /code
-RUN pip install -r requirements.txt
-RUN chmod ug+x /code/initialize.sh
+RUN pip install -r /control/requirements.txt
+RUN chmod ug+x /control/initialize.sh
 
 # Expose ports
 # 80 = Nginx
@@ -46,7 +49,7 @@ RUN chmod ug+x /code/initialize.sh
 EXPOSE 80 8000 3306
 
 # Configure Nginx
-RUN ln -s /code/nginx.conf /etc/nginx/sites-enabled/django_docker.conf
+RUN ln -s /control/nginx.conf /etc/nginx/sites-enabled/django_docker.conf
 RUN rm /etc/nginx/sites-enabled/default
 
 # Run Supervisor (i.e., start MySQL, Nginx, and Gunicorn)
